@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "950257761858",
+    "firebase_url": "https://mpas-d8a69-default-rtdb.firebaseio.com",
+    "project_id": "mpas-d8a69",
+    "storage_bucket": "mpas-d8a69.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:950257761858:android:29d35c342ab598f7ee77db",
+        "android_client_info": {
+          "package_name": "com.ingskill.googlempas"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpWg5T6vlC-MlMFI_9UOU6QXGU_XQ5NyE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

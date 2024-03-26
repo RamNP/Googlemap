@@ -1,10 +1,13 @@
 package com.ingskill.googlempas
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
 import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,6 +46,10 @@ import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.Polyline
+import com.google.android.gms.maps.model.PolylineOptions
+import com.google.firebase.database.ktx.database
+import com.google.firebase.ktx.Firebase
 import com.ingskill.googlempas.ui.theme.GoogleMpasTheme
 
 class MainActivity : ComponentActivity() {
@@ -54,7 +62,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MapWithMarkers()
+                    MyApp()
                 }
             }
         }
@@ -62,28 +70,67 @@ class MainActivity : ComponentActivity() {
 }
 
 
-@SuppressLint("MissingPermission")
 @Composable
-fun MapWithMarkers() {
-    var lat by remember { mutableStateOf("") }
-    var lng by remember { mutableStateOf("") }
-    val context = LocalContext.current
-    var mapView: MapView? by remember { mutableStateOf(null) }
-    var googleMap: GoogleMap? by remember { mutableStateOf(null) }
-    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-//    val database = Firebase.database
-//    val databaseRef = database.getReference("busLocation")
+fun MyApp() {
+    var isMapOpened by remember { mutableStateOf(false) }
 
-    fun updateMarkerPosition(latitude: Double, longitude: Double) {
-        googleMap?.apply {
-            clear()
-            val coordinates = LatLng(latitude, longitude)
-            addMarker(MarkerOptions().position(coordinates))
-            moveCamera(CameraUpdateFactory.newLatLngZoom(coordinates, 10f))
+    Column(
+        modifier = Modifier
+            .fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Button(
+            onClick = {
+                isMapOpened = true
+            },
+            enabled = !isMapOpened
+        ) {
+            Text("Update bus location Map")
+        }
+
+        if (isMapOpened) {
+            MainGoogleMap()
         }
     }
+}
 
+@SuppressLint("MissingPermission")
+@Composable
+fun MainGoogleMap() {
+    var markers by remember { mutableStateOf(emptyList<LatLng>()) }
+    var lat by remember { mutableStateOf("") }
+    var lng by remember { mutableStateOf("") }
+    var mapView: MapView? by remember { mutableStateOf(null) }
+    var googleMap: GoogleMap? by remember { mutableStateOf(null) }
+    val database = Firebase.database
+    val databaseRef = database.getReference("busLocation")
+    var polyline: Polyline? = null // Variable to hold the polyline
 
+    fun setMapClickListener() {
+        googleMap?.setOnMapClickListener { latLng ->
+            markers = markers + listOf(latLng)
+            googleMap?.addMarker(MarkerOptions().position(latLng))
+            if (markers.size >= 2) {
+                polyline?.remove() // Remove the existing polyline if any
+                val polylineOptions = PolylineOptions().apply {
+                    color(Color.RED)
+                    width(5f)
+                    markers.forEach { marker ->
+                        add(marker)
+                    }
+                }
+                polyline = googleMap?.addPolyline(polylineOptions) // Draw new polyline
+            }
+            val locationData = markers.mapIndexed { index, latLng ->
+                "Location${index + 1}" to hashMapOf(
+                    "latitude" to latLng.latitude,
+                    "longitude" to latLng.longitude
+                )
+            }.toMap()
+            databaseRef.setValue(locationData)
+        }
+    }
 
 
     DisposableEffect(Unit) {
@@ -97,7 +144,10 @@ fun MapWithMarkers() {
                 }
                 map.uiSettings.isZoomControlsEnabled = true
                 map.uiSettings.isMapToolbarEnabled = true
-
+                markers.forEach { marker ->
+                    googleMap?.addMarker(MarkerOptions().position(marker))
+                }
+                setMapClickListener()
             }
             mapView?.getMapAsync(callback)
             callback
@@ -134,27 +184,6 @@ fun MapWithMarkers() {
             )
         }
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = {
-            val latDouble = lat.toDoubleOrNull()
-            val lngDouble = lng.toDoubleOrNull()
-            if (latDouble != null && lngDouble != null) {
-                val coordinates = LatLng(latDouble, lngDouble)
-                googleMap?.apply {
-                    clear()
-                    addMarker(MarkerOptions().position(coordinates))
-                    moveCamera(CameraUpdateFactory.newLatLngZoom(coordinates, 10f))
-                }
-                val coordinateData = hashMapOf(
-                    "latitude" to latDouble,
-                    "longitude" to lngDouble
-                )
-//                databaseRef.setValue(coordinateData)
-
-            }
-        }) {
-            Text(text = "Update Map")
-        }
-        Spacer(modifier = Modifier.height(16.dp))
         AndroidView(
             { context ->
                 MapView(context).apply {
@@ -167,3 +196,5 @@ fun MapWithMarkers() {
         )
     }
 }
+
+
